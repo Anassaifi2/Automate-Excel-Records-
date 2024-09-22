@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-16"?>
+<Activity x:Class="ProcessExcel"
+          xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
+          xmlns:s="clr-namespace:System;assembly=mscorlib"
+          xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Sequence>
+    <!-- Define variables -->
+    <Variable x:TypeArguments="System.Data.DataTable" Default="New DataTable()" Name="dataTable" />
+    <Variable x:TypeArguments="System.Data.DataTable" Default="New DataTable()" Name="errorDataTable" />
+    
+    <!-- Initialize the Error DataTable structure -->
+    <Assign>
+      <Assign.To>
+        <OutArgument x:TypeArguments="System.Data.DataTable">[errorDataTable]</OutArgument>
+      </Assign.To>
+      <Assign.Value>
+        <InArgument x:TypeArguments="System.Data.DataTable">
+          <![CDATA[
+          New DataTable("ErrorTable") 
+          {
+            Columns = { "RowID", "ErrorMessage" }
+          }
+          ]]>
+        </InArgument>
+      </Assign.Value>
+    </Assign>
+    
+    <!-- Open Excel Application Scope -->
+    <ExcelApplicationScope FilePath="C:\Path\To\Your\ExcelFile.xlsx" DisplayName="Open Excel File">
+      
+      <!-- Read Data from Excel -->
+      <ReadRange DataTable="[dataTable]" SheetName="Sheet1" DisplayName="Read Excel Data" />
+      
+      <!-- Process Each Row -->
+      <ForEach x:TypeArguments="System.Data.DataRow" Values="[dataTable.Rows]" DisplayName="For Each Row in DataTable">
+        <ForEach.Body>
+          <ActivityAction x:TypeArguments="System.Data.DataRow">
+            <ActivityAction.Argument>
+              <DelegateInArgument x:TypeArguments="System.Data.DataRow" Name="row" />
+            </ActivityAction.Argument>
+            <TryCatch DisplayName="Try-Catch for Row Processing">
+              <TryCatch.Try>
+                <!-- Example Data Processing -->
+                <If Condition="[row(""Column1"").ToString() = """"]" DisplayName="Check for Missing Data">
+                  <If.Then>
+                    <Throw DisplayName="Throw Exception for Missing Data">
+                      <Exception>
+                        <InArgument x:TypeArguments="System.Exception">
+                          <![CDATA[New Exception("Missing data in Column1")]]>
+                        </InArgument>
+                      </Exception>
+                    </Throw>
+                  </If.Then>
+                </If>
+                
+                <!-- Update Processed Data -->
+                <Assign DisplayName="Update Processed Column">
+                  <Assign.To>
+                    <OutArgument x:TypeArguments="System.Object">[row(""ProcessedColumn"")]</OutArgument>
+                  </Assign.To>
+                  <Assign.Value>
+                    <InArgument x:TypeArguments="System.Object">"ProcessedValue"</InArgument>
+                  </Assign.Value>
+                </Assign>
+              </TryCatch.Try>
+              <TryCatch.Catches>
+                <!-- Handle Exceptions -->
+                <Catch x:TypeArguments="System.Exception" DisplayName="Handle Exception">
+                  <Sequence DisplayName="Log and Record Error">
+                    <LogMessage DisplayName="Log Error Message" Text="Error in row ID: [row(""ID"").ToString] - [ex.Message]" Level="Error" />
+                    <AddDataRow DataTable="[errorDataTable]" DisplayName="Add to Error Table">
+                      <DataRow>New Object() { row("ID").ToString(), ex.Message }</DataRow>
+                    </AddDataRow>
+                  </Sequence>
+                </Catch>
+              </TryCatch.Catches>
+            </TryCatch>
+          </ActivityAction>
+        </ForEach.Body>
+      </ForEach>
+      
+      <!-- Write Back Processed Data -->
+      <WriteRange DataTable="[dataTable]" SheetName="Sheet1" DisplayName="Write Processed Data" />
+      
+      <!-- Optionally Write Error Data -->
+      <WriteRange DataTable="[errorDataTable]" SheetName="ErrorLog" DisplayName="Write Error Data" />
+      
+    </ExcelApplicationScope>
+  </Sequence>
+</Activity>
